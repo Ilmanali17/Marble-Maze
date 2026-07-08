@@ -105,9 +105,15 @@
                     <h1 class="text-2xl font-bold text-gray-800 flex items-center justify-center lg:justify-start gap-2 hidden lg:flex">
                         <i data-lucide="layout-grid" class="w-6 h-6 text-blue-500"></i> MARBLE MAZE
                     </h1>
-                    <button id="restart-btn" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2 border border-gray-300 text-sm">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> ULANG LEVEL
-                    </button>
+                    <!-- 1. STREAMING_CHUNK: Membagi tombol Ulang menjadi Menu dan Ulang -->
+                    <div class="flex gap-2 w-full">
+                        <button id="back-menu-btn" class="w-1/2 bg-white hover:bg-gray-50 text-gray-700 font-bold py-2 px-2 rounded-lg transition duration-200 flex items-center justify-center gap-1 border border-gray-300 text-xs sm:text-sm shadow-sm active:bg-gray-100">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i> MENU
+                        </button>
+                        <button id="restart-btn" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-2 rounded-lg transition duration-200 flex items-center justify-center gap-1 border border-gray-300 text-xs sm:text-sm shadow-sm active:bg-gray-300">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> ULANG
+                        </button>
+                    </div>
                 </div>
 
                 <!-- P1 Info Box -->
@@ -174,6 +180,7 @@
         const winnerIconContainer = document.getElementById('winner-icon-container');
         const winnerTitle = document.getElementById('winner-title');
         const winnerDesc = document.getElementById('winner-desc');
+        const backMenuBtn = document.getElementById('back-menu-btn');
 
         // Game Configuration
         let TILE_SIZE = 40;
@@ -520,6 +527,28 @@
         });
 
         document.getElementById('restart-btn').addEventListener('click', initLevel);
+
+        // 2. STREAMING_CHUNK: Logika tombol kembali ke menu
+        backMenuBtn.addEventListener('click', () => {
+            // Hentikan permainan dan timer
+            clearInterval(timerInterval);
+            gameStarted = false;
+            
+            // Hapus sesi penyimpanan agar tidak otomatis dimuat kembali
+            sessionStorage.removeItem('marbleMazeState');
+            
+            // Sembunyikan layar permainan
+            mainGameContainer.classList.add('opacity-0', 'pointer-events-none');
+            
+            // Tampilkan kembali layar intro dengan animasi halus
+            introScreen.classList.remove('hidden');
+            
+            // Jeda sejenak untuk memastikan browser me-render display:block sebelum mengubah opacity
+            setTimeout(() => {
+                introScreen.classList.remove('opacity-0');
+                introContent.classList.replace('scale-110', 'scale-100');
+            }, 10);
+        });
 
         const setupDPad = (p) => {
             Object.entries(p.dpad).forEach(([dir, id]) => {
