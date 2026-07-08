@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marble Maze Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f3f4f6;
+        }
+        canvas {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            cursor: none;
+        }
+        /* Rotasi D-Pad Player 2 untuk layar mobile agar bisa dimainkan berhadapan */
+        .rotate-180-mobile { transform: rotate(180deg); }
+        @media (min-width: 1024px) {
+            .rotate-180-mobile { transform: none; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen justify-between">
+
+    <!-- Welcome / Intro Screen Overlay -->
+    <div id="intro-screen" class="fixed inset-0 bg-blue-50 z-[100] flex flex-col items-center justify-center p-4 transition-opacity duration-500">
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center flex flex-col items-center gap-6 transform scale-100 transition-transform duration-500" id="intro-content">
+            
+            <div class="space-y-4 py-4">
+                <h1 class="text-5xl font-extrabold text-gray-800 tracking-tight">Marble Maze</h1>
+                <p class="text-blue-600 font-semibold text-xl flex items-center justify-center gap-2">
+                    <i data-lucide="code-2" class="w-6 h-6"></i> 
+                    Game Dibuat Oleh <span class="font-bold underline decoration-wavy decoration-blue-300">Akang</span>
+                </p>
+                <p class="text-gray-500 text-base mt-4 px-2 leading-relaxed">Tantang logikamu, arahkan kelereng melewati rintangan, dan temukan jalan keluar secepat mungkin!</p>
+            </div>
+
+            <!-- Pilihan Mode -->
+            <div class="flex flex-col gap-3 w-full mt-2">
+                <button onclick="startGame(1)" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold py-3 px-6 rounded-2xl transition-all duration-200 border-2 border-blue-300 active:scale-95 flex items-center justify-center gap-3 text-lg">
+                    <i data-lucide="user" class="w-5 h-5"></i>
+                    MAIN SENDIRI
+                </button>
+                <button onclick="startGame(2)" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-[0_8px_30px_rgb(59,130,246,0.3)] active:scale-95 flex items-center justify-center gap-3 text-lg group">
+                    <i data-lucide="users" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                    MAIN BERDUA (BALAPAN)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Konten Utama Game -->
+    <main id="main-game-container" class="flex-grow flex items-center justify-center p-2 md:p-8 opacity-0 transition-opacity duration-700 pointer-events-none">
+        
+        <!-- Grid dinamis: 3 kolom untuk 2 pemain, 2 kolom untuk 1 pemain -->
+        <div id="game-grid" class="bg-white rounded-2xl shadow-xl p-4 md:p-8 grid gap-4 lg:gap-6 w-full max-w-7xl items-center grid-cols-1 lg:grid-cols-4">
+            
+            <!-- INFO & KONTROL PLAYER 2 (Disembunyikan di mode 1 pemain, Posisinya di atas pada Mobile, Kanan pada Desktop) -->
+            <div id="p2-panel" class="hidden flex-col items-center justify-center gap-4 lg:gap-6 order-1 lg:order-3 w-full rotate-180-mobile border-b-2 lg:border-b-0 lg:border-l-2 border-dashed border-gray-200 pb-4 lg:pb-0 lg:pl-6">
+                <!-- P2 Header -->
+                <div class="bg-red-50 p-3 rounded-xl border border-red-100 flex flex-col gap-2 w-full text-center lg:text-left shadow-sm">
+                    <div class="flex justify-between items-center px-2">
+                        <span class="text-red-600 font-bold flex items-center gap-2"><i data-lucide="circle-dot" class="w-5 h-5 text-red-500"></i> PLAYER 2</span>
+                        <span id="p2-score-display" class="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded-md">MENANG: 0</span>
+                    </div>
+                    <div class="text-xs text-red-400 px-2 lg:text-left text-center">Kontrol: Tombol Panah (Keyboard)</div>
+                </div>
+
+                <!-- P2 D-Pad (Warna Merah) -->
+                <div class="flex flex-col items-center gap-1 w-full select-none" style="touch-action: none;">
+                    <button id="btn-up-p2" class="w-14 h-14 bg-white border-2 border-red-200 rounded-xl shadow-sm text-red-400 transition-all active:bg-red-50"><i data-lucide="arrow-up" class="w-8 h-8 mx-auto"></i></button>
+                    <div class="flex gap-1">
+                        <button id="btn-left-p2" class="w-14 h-14 bg-white border-2 border-red-200 rounded-xl shadow-sm text-red-400 transition-all active:bg-red-50"><i data-lucide="arrow-left" class="w-8 h-8 mx-auto"></i></button>
+                        <button id="btn-down-p2" class="w-14 h-14 bg-white border-2 border-red-200 rounded-xl shadow-sm text-red-400 transition-all active:bg-red-50"><i data-lucide="arrow-down" class="w-8 h-8 mx-auto"></i></button>
+                        <button id="btn-right-p2" class="w-14 h-14 bg-white border-2 border-red-200 rounded-xl shadow-sm text-red-400 transition-all active:bg-red-50"><i data-lucide="arrow-right" class="w-8 h-8 mx-auto"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CANVAS AREA (Tengah) -->
+            <div id="canvas-container" class="lg:col-span-2 flex flex-col justify-center items-center bg-gray-100 rounded-xl p-2 md:p-4 gap-2 lg:gap-4 order-2 overflow-hidden shadow-inner" style="touch-action: none;">
+                
+                <!-- Status Bar Atas Canvas (Hanya Level & Waktu) -->
+                <div class="flex justify-between items-center w-full px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="flag" class="w-4 h-4 text-blue-500"></i>
+                        <span class="text-gray-600 font-bold text-sm">LEVEL <span id="level-display" class="text-blue-600">1</span></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="timer" class="w-4 h-4 text-orange-500"></i>
+                        <span id="time-display" class="text-orange-600 font-bold font-mono text-sm">00:00</span>
+                    </div>
+                </div>
+
+                <canvas id="gameCanvas" width="840" height="600" class="bg-white rounded-lg border-2 border-gray-300 max-w-full h-auto"></canvas>
+            </div>
+
+            <!-- INFO & KONTROL PLAYER 1 (Kiri pada Desktop, Bawah pada Mobile) -->
+            <div id="p1-panel" class="flex flex-col items-center justify-center gap-4 lg:gap-6 order-3 lg:order-1 w-full lg:pr-6">
+                <!-- Global / P1 Header -->
+                <div class="flex flex-col gap-2 w-full text-center lg:text-left">
+                    <h1 class="text-2xl font-bold text-gray-800 flex items-center justify-center lg:justify-start gap-2 hidden lg:flex">
+                        <i data-lucide="layout-grid" class="w-6 h-6 text-blue-500"></i> MARBLE MAZE
+                    </h1>
+                    <button id="restart-btn" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2 border border-gray-300 text-sm">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> ULANG LEVEL
+                    </button>
+                </div>
+
+                <!-- P1 Info Box -->
+                <div class="bg-blue-50 p-3 rounded-xl border border-blue-100 flex flex-col gap-2 w-full text-center lg:text-left shadow-sm">
+                    <div class="flex justify-between items-center px-2">
+                        <span class="text-blue-600 font-bold flex items-center gap-2"><i data-lucide="circle-dot" class="w-5 h-5 text-blue-500"></i> PLAYER 1</span>
+                        <span id="p1-score-display" class="hidden bg-blue-200 text-blue-800 text-xs font-bold px-2 py-1 rounded-md">MENANG: 0</span>
+                    </div>
+                    <div class="text-xs text-blue-400 px-2 lg:text-left text-center">Kontrol: Tombol W A S D (Keyboard)</div>
+                </div>
+                
+                <!-- P1 D-Pad (Warna Biru) -->
+                <div class="flex flex-col items-center gap-1 w-full select-none" style="touch-action: none;">
+                    <button id="btn-up-p1" class="w-14 h-14 bg-white border-2 border-blue-200 rounded-xl shadow-sm text-blue-400 transition-all active:bg-blue-50"><i data-lucide="arrow-up" class="w-8 h-8 mx-auto"></i></button>
+                    <div class="flex gap-1">
+                        <button id="btn-left-p1" class="w-14 h-14 bg-white border-2 border-blue-200 rounded-xl shadow-sm text-blue-400 transition-all active:bg-blue-50"><i data-lucide="arrow-left" class="w-8 h-8 mx-auto"></i></button>
+                        <button id="btn-down-p1" class="w-14 h-14 bg-white border-2 border-blue-200 rounded-xl shadow-sm text-blue-400 transition-all active:bg-blue-50"><i data-lucide="arrow-down" class="w-8 h-8 mx-auto"></i></button>
+                        <button id="btn-right-p1" class="w-14 h-14 bg-white border-2 border-blue-200 rounded-xl shadow-sm text-blue-400 transition-all active:bg-blue-50"><i data-lucide="arrow-right" class="w-8 h-8 mx-auto"></i></button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Kemenangan (Level Complete / Player Win) -->
+    <div id="level-modal" class="fixed inset-0 bg-gray-900/60 hidden flex items-center justify-center z-50 backdrop-blur-md transition-opacity duration-300 opacity-0">
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300 flex flex-col items-center text-center border-t-8 border-blue-500" id="level-modal-content">
+            <div id="winner-icon-container" class="bg-blue-100 text-blue-500 w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                <i data-lucide="trophy" class="w-10 h-10"></i>
+            </div>
+            <h2 id="winner-title" class="text-3xl font-bold text-gray-800 mb-2">Level Selesai!</h2>
+            <p id="winner-desc" class="text-gray-600 mb-8 font-medium">Luar biasa! Lanjut ke level berikutnya.</p>
+            
+            <button id="next-level-btn" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-4 px-6 rounded-xl transition duration-200 shadow-md flex items-center justify-center gap-2">
+                LANJUT <span id="next-level-text">LEVEL 2</span>
+                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Memanggil ikon Lucide
+        lucide.createIcons();
+
+        // 1. STREAMING_CHUNK: Mengambil elemen DOM
+        const introScreen = document.getElementById('intro-screen');
+        const introContent = document.getElementById('intro-content');
+        const mainGameContainer = document.getElementById('main-game-container');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameGrid = document.getElementById('game-grid');
+        const canvasContainer = document.getElementById('canvas-container');
+        const p1Panel = document.getElementById('p1-panel');
+        const p2Panel = document.getElementById('p2-panel');
+        
+        // Modal & Info
+        const levelDisplay = document.getElementById('level-display');
+        const timeDisplay = document.getElementById('time-display');
+        const levelModal = document.getElementById('level-modal');
+        const levelModalContent = document.getElementById('level-modal-content');
+        const p1ScoreDisplay = document.getElementById('p1-score-display');
+        const p2ScoreDisplay = document.getElementById('p2-score-display');
+        const winnerIconContainer = document.getElementById('winner-icon-container');
+        const winnerTitle = document.getElementById('winner-title');
+        const winnerDesc = document.getElementById('winner-desc');
+
+        // Game Configuration
+        let TILE_SIZE = 40;
+        let MARBLE_RADIUS = TILE_SIZE / 2 - 4;
+        let MAZE_WIDTH = 21; 
+        let MAZE_HEIGHT = 15;
+
+        // 2. STREAMING_CHUNK: Mendefinisikan variabel status permainan
+        let currentMode = 1; // 1 = Singleplayer, 2 = Multiplayer
+        let gameStarted = false;
+        let level = 1;
+        let time = 0;
+        let timerInterval;
+        let isGameOver = false;
+        let isTransitioning = false;
+        let keys = {};
+        
+        let p1Score = 0;
+        let p2Score = 0;
+
+        let mazeMap = [];
+
+        // Struktur Data Pemain
+        const players = {
+            1: {
+                id: 1, color: '#3b82f6', glow: '#93c5fd', portalColor: '#22c55e', 
+                startGrid: {x: 1, y: 1}, endGrid: null, // End grid diset saat generate maze
+                x: 0, y: 0, targetX: 0, targetY: 0, gridX: 1, gridY: 1,
+                isMoving: false, moveDelay: 0, delayFrames: 8, speed: 6, trail: [],
+                controls: { up: 'w', down: 's', left: 'a', right: 'd' },
+                dpad: { up: 'btn-up-p1', down: 'btn-down-p1', left: 'btn-left-p1', right: 'btn-right-p1' }
+            },
+            2: {
+                id: 2, color: '#ef4444', glow: '#fca5a5', portalColor: '#eab308', 
+                startGrid: null, endGrid: {x: 1, y: 1}, 
+                x: 0, y: 0, targetX: 0, targetY: 0, gridX: 1, gridY: 1,
+                isMoving: false, moveDelay: 0, delayFrames: 8, speed: 6, trail: [],
+                controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
+                dpad: { up: 'btn-up-p2', down: 'btn-down-p2', left: 'btn-left-p2', right: 'btn-right-p2' }
+            }
+        };
+
+        // --- CORE LOGIC ---
+
+        // 3. STREAMING_CHUNK: Fungsi untuk memulai game (single/multi)
+        function startGame(mode) {
+            currentMode = mode;
+            gameStarted = true;
+            p1Score = 0;
+            p2Score = 0;
+
+            // Atur UI berdasarkan mode
+            if (mode === 2) {
+                // Multiplayer Layout
+                gameGrid.classList.replace('lg:grid-cols-4', 'lg:grid-cols-4');
+                canvasContainer.classList.replace('lg:col-span-3', 'lg:col-span-2');
+                p1Panel.classList.replace('lg:col-span-1', 'lg:col-span-1');
+                
+                p2Panel.classList.remove('hidden');
+                p2Panel.classList.add('flex');
+                
+                p1ScoreDisplay.classList.remove('hidden');
+                p2ScoreDisplay.classList.remove('hidden');
+            } else {
+                // Singleplayer Layout
+                gameGrid.classList.replace('lg:grid-cols-4', 'lg:grid-cols-4');
+                canvasContainer.classList.replace('lg:col-span-2', 'lg:col-span-3');
+                
+                p2Panel.classList.add('hidden');
+                p2Panel.classList.remove('flex');
+                
+                p1ScoreDisplay.classList.add('hidden');
+            }
+
+            // Transisi Intro
+            introContent.classList.replace('scale-100', 'scale-110');
+            introScreen.classList.add('opacity-0');
+            
+            setTimeout(() => {
+                introScreen.classList.add('hidden');
+                mainGameContainer.classList.remove('opacity-0', 'pointer-events-none');
+                
+                setTimeout(() => {
+                    initLevel(); // initLevel akan mengatur MAZE_WIDTH dll
+                }, 100);
+            }, 500);
+        }
+
+        // 4. STREAMING_CHUNK: Inisialisasi level
+        function initLevel() {
+            isGameOver = false;
+            isTransitioning = false;
+            time = 0;
+            
+            levelModal.classList.add('hidden', 'opacity-0');
+            levelModalContent.classList.add('scale-95');
+            levelModalContent.classList.remove('scale-100');
+
+            // Setel ukuran labirin sesuai mode
+            if (currentMode === 2) {
+                MAZE_WIDTH = 25; 
+                MAZE_HEIGHT = 17;
+            } else {
+                MAZE_WIDTH = 21; 
+                MAZE_HEIGHT = 15;
+            }
+
+            resizeCanvas(); // Panggil ini SETELAH ukuran maze map ditentukan
+            generateMaze();
+            
+            // Set Start/End untuk P2 berseberangan dengan P1
+            players[2].startGrid = {x: MAZE_WIDTH - 2, y: MAZE_HEIGHT - 2};
+            players[1].endGrid = {x: MAZE_WIDTH - 2, y: MAZE_HEIGHT - 2};
+
+            resetPlayer(players[1]);
+            if (currentMode === 2) resetPlayer(players[2]);
+
+            updateUI();
+            startTimer();
+            saveState();
+        }
+
+        // 5. STREAMING_CHUNK: Fungsi utilitas game (reset, generate)
+        function resetPlayer(p) {
+            p.gridX = p.startGrid.x;
+            p.gridY = p.startGrid.y;
+            p.x = (p.gridX + 0.5) * TILE_SIZE;
+            p.y = (p.gridY + 0.5) * TILE_SIZE;
+            p.targetX = p.x;
+            p.targetY = p.y;
+            p.isMoving = false;
+            p.moveDelay = 0;
+            p.trail = [];
+        }
+
+        function generateMaze() {
+            mazeMap = [];
+            for (let r = 0; r < MAZE_HEIGHT; r++) mazeMap.push(new Array(MAZE_WIDTH).fill(1));
+
+            let stack = [];
+            mazeMap[1][1] = 0;
+            stack.push({r: 1, c: 1});
+
+            while (stack.length > 0) {
+                let current = stack.pop();
+                let dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]].sort(() => Math.random() - 0.5);
+
+                for (let dir of dirs) {
+                    let nr = current.r + dir[0], nc = current.c + dir[1];
+                    if (nr > 0 && nr < MAZE_HEIGHT - 1 && nc > 0 && nc < MAZE_WIDTH - 1 && mazeMap[nr][nc] === 1) {
+                        mazeMap[current.r + dir[0]/2][current.c + dir[1]/2] = 0;
+                        mazeMap[nr][nc] = 0;
+                        stack.push(current);
+                        stack.push({r: nr, c: nc});
+                        break;
+                    }
+                }
+            }
+            // Kosongkan area mulai & akhir
+            mazeMap[1][1] = 0; mazeMap[1][2] = 0; mazeMap[2][1] = 0;
+            mazeMap[MAZE_HEIGHT-2][MAZE_WIDTH-2] = 0; mazeMap[MAZE_HEIGHT-2][MAZE_WIDTH-3] = 0; mazeMap[MAZE_HEIGHT-3][MAZE_WIDTH-2] = 0;
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!isGameOver && !isTransitioning) {
+                    time++;
+                    updateUI();
+                    saveState();
+                }
+            }, 1000);
+        }
+
+        function updateUI() {
+            levelDisplay.textContent = level;
+            timeDisplay.textContent = `${Math.floor(time / 60).toString().padStart(2, '0')}:${(time % 60).toString().padStart(2, '0')}`;
+            p1ScoreDisplay.textContent = `MENANG: ${p1Score}`;
+            p2ScoreDisplay.textContent = `MENANG: ${p2Score}`;
+        }
+
+        // --- RENDER LOGIC ---
+
+        // 6. STREAMING_CHUNK: Menggambar komponen (maze, portal, player)
+        function drawMaze() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let r = 0; r < MAZE_HEIGHT; r++) {
+                for (let c = 0; c < MAZE_WIDTH; c++) {
+                    const x = c * TILE_SIZE, y = r * TILE_SIZE;
+                    if (mazeMap[r] && mazeMap[r][c] === 1) { // pastikan mazeMap valid
+                        ctx.fillStyle = '#cbd5e1'; ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.strokeRect(x+0.5, y+0.5, TILE_SIZE-1, TILE_SIZE-1);
+                    } else {
+                        ctx.fillStyle = '#f8fafc'; ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+            // Draw Portals
+            if (players[1].startGrid && players[1].endGrid) { // pastikan grid valid
+                drawPortal(players[1].startGrid.x, players[1].startGrid.y, players[1].portalColor);
+                drawPortal(players[1].endGrid.x, players[1].endGrid.y, players[1].color);
+                if (currentMode === 2 && players[2].endGrid) {
+                    drawPortal(players[2].endGrid.x, players[2].endGrid.y, players[2].color);
+                }
+            }
+        }
+
+        function drawPortal(gx, gy, color) {
+            const cx = gx * TILE_SIZE + TILE_SIZE / 2;
+            const cy = gy * TILE_SIZE + TILE_SIZE / 2;
+            const r = TILE_SIZE / 2.5;
+            
+            const grad = ctx.createRadialGradient(cx, cy, r*0.2, cx, cy, r*1.5);
+            grad.addColorStop(0, color); grad.addColorStop(0.5, color + '80'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, r*1.5, 0, Math.PI*2); ctx.fill();
+            
+            ctx.fillStyle = color; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, r*0.7, 0, Math.PI*2); ctx.stroke();
+        }
+
+        function drawPlayer(p) {
+            if (p.trail.length > 0) {
+                ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.shadowColor = p.glow; ctx.shadowBlur = 10;
+                ctx.strokeStyle = p.color + '60'; ctx.lineWidth = MARBLE_RADIUS * 0.8;
+                ctx.beginPath(); ctx.moveTo(p.trail[0].x, p.trail[0].y);
+                for (let i = 1; i < p.trail.length; i++) ctx.lineTo(p.trail[i].x, p.trail[i].y);
+                ctx.stroke(); ctx.restore();
+            }
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + MARBLE_RADIUS*0.8, MARBLE_RADIUS*0.8, MARBLE_RADIUS*0.4, 0, 0, Math.PI*2); ctx.fill();
+            
+            const grad = ctx.createRadialGradient(p.x - MARBLE_RADIUS/3, p.y - MARBLE_RADIUS/3, MARBLE_RADIUS/4, p.x, p.y, MARBLE_RADIUS);
+            grad.addColorStop(0, p.glow); grad.addColorStop(1, p.color);
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(p.x, p.y, MARBLE_RADIUS, 0, Math.PI*2); ctx.fill();
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(p.x - MARBLE_RADIUS/3, p.y - MARBLE_RADIUS/3, MARBLE_RADIUS/4, MARBLE_RADIUS/6, Math.PI/4, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        // --- UPDATE LOGIC ---
+
+        // 7. STREAMING_CHUNK: Mengelola pergerakan pemain
+        function updatePlayer(p) {
+            if (isGameOver || isTransitioning) return;
+
+            if (!p.isMoving) {
+                let dx = 0, dy = 0;
+                
+                // Cek Keyboard ATAU D-Pad Sentuh
+                if (keys[p.controls.up]) dy = -1;
+                else if (keys[p.controls.down]) dy = 1;
+                else if (keys[p.controls.left]) dx = -1;
+                else if (keys[p.controls.right]) dx = 1;
+
+                if (dx === 0 && dy === 0) p.moveDelay = 0;
+                if (p.moveDelay > 0) { p.moveDelay--; return; }
+
+                if (dx !== 0 || dy !== 0) {
+                    let nx = p.gridX + dx, ny = p.gridY + dy;
+                    if (nx >= 0 && nx < MAZE_WIDTH && ny >= 0 && ny < MAZE_HEIGHT && mazeMap[ny] && mazeMap[ny][nx] !== 1) {
+                        p.gridX = nx; p.gridY = ny;
+                        p.targetX = (p.gridX + 0.5) * TILE_SIZE; p.targetY = (p.gridY + 0.5) * TILE_SIZE;
+                        p.isMoving = true;
+                    }
+                }
+            } else {
+                let dx = p.targetX - p.x, dy = p.targetY - p.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist <= p.speed) {
+                    p.x = p.targetX; p.y = p.targetY; p.isMoving = false; p.moveDelay = p.delayFrames;
+                    checkWin(p);
+                } else {
+                    p.x += (dx/dist) * p.speed; p.y += (dy/dist) * p.speed;
+                }
+
+                p.trail.push({x: p.x, y: p.y});
+                if (p.trail.length > 15) p.trail.shift();
+            }
+        }
+
+        // 8. STREAMING_CHUNK: Logika Cek Kemenangan
+        function checkWin(p) {
+            if (p.endGrid && p.gridX === p.endGrid.x && p.gridY === p.endGrid.y && !isTransitioning) {
+                isTransitioning = true;
+                clearInterval(timerInterval);
+                keys = {};
+
+                // Kustomisasi Pop Up Modal
+                if (currentMode === 2) {
+                    if (p.id === 1) { p1Score++; setModalWinner('PLAYER 1 MENANG!', 'text-blue-600', 'bg-blue-100', 'border-blue-500'); }
+                    else { p2Score++; setModalWinner('PLAYER 2 MENANG!', 'text-red-600', 'bg-red-100', 'border-red-500'); }
+                    winnerDesc.textContent = "Kelereng tercepat yang sampai tujuan!";
+                } else {
+                    setModalWinner('Level Selesai!', 'text-blue-600', 'bg-blue-100', 'border-blue-500');
+                    winnerDesc.textContent = `Waktu kamu: ${timeDisplay.textContent}`;
+                }
+
+                document.getElementById('next-level-text').textContent = `LEVEL ${level + 1}`;
+                
+                levelModal.classList.remove('hidden'); void levelModal.offsetWidth;
+                levelModal.classList.remove('opacity-0'); levelModal.classList.add('opacity-100');
+                levelModalContent.classList.remove('scale-95'); levelModalContent.classList.add('scale-100');
+            }
+        }
+
+        function setModalWinner(title, textColor, bgColor, borderColor) {
+            winnerTitle.textContent = title;
+            winnerTitle.className = `text-3xl font-bold mb-2 ${textColor}`;
+            winnerIconContainer.className = `${bgColor} ${textColor} w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-inner`;
+            levelModalContent.className = `bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 transform scale-100 transition-transform duration-300 flex flex-col items-center text-center border-t-8 ${borderColor}`;
+        }
+
+        document.getElementById('next-level-btn').addEventListener('click', () => {
+            levelModal.classList.remove('opacity-100'); levelModal.classList.add('opacity-0');
+            levelModalContent.classList.remove('scale-100'); levelModalContent.classList.add('scale-95');
+            setTimeout(() => { level++; initLevel(); }, 300);
+        });
+
+        // 9. STREAMING_CHUNK: Gameloop utama
+        function gameLoop() {
+            if (gameStarted && mazeMap.length > 0) { // pastikan map sudah jadi
+                updatePlayer(players[1]);
+                if (currentMode === 2) updatePlayer(players[2]);
+                
+                drawMaze();
+                drawPlayer(players[1]);
+                if (currentMode === 2) drawPlayer(players[2]);
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- INPUT & RESIZE ---
+
+        window.addEventListener('keydown', (e) => { 
+            let key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            if (Object.values(players[1].controls).includes(key) || Object.values(players[2].controls).includes(key)) { keys[key] = true; e.preventDefault(); }
+        });
+        window.addEventListener('keyup', (e) => { 
+            let key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            keys[key] = false; 
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', initLevel);
+
+        const setupDPad = (p) => {
+            Object.entries(p.dpad).forEach(([dir, id]) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                const key = p.controls[dir]; 
+                const press = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('scale-90'); };
+                const release = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('scale-90'); };
+                btn.addEventListener('pointerdown', press);
+                btn.addEventListener('pointerup', release);
+                btn.addEventListener('pointercancel', release);
+                btn.addEventListener('pointerleave', release);
+                btn.addEventListener('contextmenu', (e) => e.preventDefault());
+            });
+        };
+        setupDPad(players[1]);
+        setupDPad(players[2]);
+
+        // 10. STREAMING_CHUNK: Handle resize
+        function resizeCanvas() {
+            if (!gameStarted || MAZE_WIDTH <= 0) return;
+            const container = canvasContainer;
+            const maxWidth = container.clientWidth - 16;
+            
+            TILE_SIZE = Math.floor(maxWidth / MAZE_WIDTH);
+            MARBLE_RADIUS = TILE_SIZE / 2 - 4;
+            
+            canvas.width = MAZE_WIDTH * TILE_SIZE;
+            canvas.height = MAZE_HEIGHT * TILE_SIZE;
+            
+            // Reposisi
+            if(players[1].gridX) {
+                players[1].x = (players[1].gridX + 0.5) * TILE_SIZE; players[1].y = (players[1].gridY + 0.5) * TILE_SIZE;
+                players[1].targetX = players[1].x; players[1].targetY = players[1].y;
+            }
+            if (currentMode === 2 && players[2].gridX) {
+                players[2].x = (players[2].gridX + 0.5) * TILE_SIZE; players[2].y = (players[2].gridY + 0.5) * TILE_SIZE;
+                players[2].targetX = players[2].x; players[2].targetY = players[2].y;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- SESSION STORAGE ---
+        function saveState() {
+            if (!gameStarted) return;
+            sessionStorage.setItem('marbleMazeState', JSON.stringify({ gameStarted, currentMode, level, time, p1Score, p2Score, mazeMap, players, MAZE_WIDTH, MAZE_HEIGHT }));
+        }
+
+        // 11. STREAMING_CHUNK: Handle pemulihan data (restore state)
+        function loadSavedState() {
+            try {
+                const saved = sessionStorage.getItem('marbleMazeState');
+                if (saved) {
+                    const s = JSON.parse(saved);
+                    if (s.gameStarted) {
+                        currentMode = s.currentMode; gameStarted = true; level = s.level; time = s.time;
+                        p1Score = s.p1Score || 0; p2Score = s.p2Score || 0;
+                        mazeMap = s.mazeMap; MAZE_WIDTH = s.MAZE_WIDTH; MAZE_HEIGHT = s.MAZE_HEIGHT;
+                        Object.assign(players[1], s.players[1]); Object.assign(players[2], s.players[2]);
+                        
+                        introScreen.style.display = 'none';
+                        mainGameContainer.classList.remove('opacity-0', 'pointer-events-none');
+                        
+                        if (currentMode === 2) {
+                            gameGrid.classList.replace('lg:grid-cols-4', 'lg:grid-cols-4');
+                            canvasContainer.classList.replace('lg:col-span-3', 'lg:col-span-2');
+                            p1Panel.classList.replace('lg:col-span-1', 'lg:col-span-1');
+                            p2Panel.classList.remove('hidden'); p2Panel.classList.add('flex');
+                            p1ScoreDisplay.classList.remove('hidden'); p2ScoreDisplay.classList.remove('hidden');
+                        } else {
+                            gameGrid.classList.replace('lg:grid-cols-4', 'lg:grid-cols-4');
+                            canvasContainer.classList.replace('lg:col-span-2', 'lg:col-span-3');
+                            p2Panel.classList.add('hidden'); p2Panel.classList.remove('flex');
+                            p1ScoreDisplay.classList.add('hidden');
+                        }
+                        
+                        setTimeout(() => { resizeCanvas(); updateUI(); startTimer(); }, 50);
+                        return true;
+                    }
+                }
+            } catch (e) { console.error(e); }
+            return false;
+        }
+
+        window.addEventListener('beforeunload', saveState);
+
+        if (!loadSavedState()) { 
+            // Inisialisasi awal palsu untuk menghindari crash sebelum start
+            MAZE_WIDTH = 21; MAZE_HEIGHT = 15; generateMaze();
+        }
+        gameLoop();
+
+    </script>
+</body>
+</html>
